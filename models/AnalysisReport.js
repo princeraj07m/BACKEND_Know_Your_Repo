@@ -1,19 +1,32 @@
 const mongoose = require("mongoose");
 
-const analysisSchema = new mongoose.Schema({
-  repoUrl: String,
+const analysisReportSchema = new mongoose.Schema({
+  repoUrl: { type: String, required: true },
   language: String,
   framework: String,
   architecture: String,
-  routes: Array,
-  controllers: Array,
-  models: Array,
+  entryPoint: String,
+  folderTree: mongoose.Schema.Types.Mixed,
+  routes: [{
+    method: String,
+    path: String,
+    handler: String,
+    sourceFile: String
+  }],
+  controllers: [{
+    name: String,
+    file: String,
+    methods: [String]
+  }],
+  models: [{
+    name: String,
+    file: String,
+    schemaSummary: String
+  }],
+  readmeSummary: String,
   summary: String,
   executionFlow: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+  createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model("AnalysisReport", analysisSchema);
+module.exports = mongoose.model("AnalysisReport", analysisReportSchema);

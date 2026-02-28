@@ -2,53 +2,82 @@ const gitService = require("../services/gitService");
 const fileScanner = require("../services/fileScannerService");
 const frameworkDetector = require("../services/frameworkDetector");
 const architectureDetector = require("../services/architectureDetector");
+const entryPointDetector = require("../services/entryPointDetector");
 const routeAnalyzer = require("../services/routeAnalyzer");
 const controllerAnalyzer = require("../services/controllerAnalyzer");
 const modelAnalyzer = require("../services/modelAnalyzer");
+const readmeService = require("../services/readmeService");
 const explanationGenerator = require("../services/explanationGenerator");
-
 const AnalysisReport = require("../models/AnalysisReport");
+const Repository = require("../models/Repository");
 
-exports.analyzeRepo = async (req, res) => {
-  const { repoUrl } = req.body;
+exports.analyzeRepo = async (req, res, next) => {
+  const repoUrl = (req.body.repoUrl || "").trim();
+  if (!repoUrl) {
+    return res.status(400).render("index", { error: "Repository URL is required." });
+  }
 
+  let projectPath = null;
   try {
-    const projectPath = await gitService.cloneRepo(repoUrl);
+    projectPath = await gitService.cloneRepo(repoUrl);
 
-    const fileTree = fileScanner.scan(projectPath);
+    const folderTree = fileScanner.scan(projectPath);
     const language = fileScanner.detectLanguage(projectPath);
     const framework = frameworkDetector.detect(projectPath);
-    const architecture = architectureDetector.detect(fileTree);
-
+    const architecture = architectureDetector.detect(folderTree);
+    const entryPoint = entryPointDetector.getEntryPoint(projectPath);
     const routes = routeAnalyzer.analyze(projectPath);
     const controllers = controllerAnalyzer.analyze(projectPath);
     const models = modelAnalyzer.analyze(projectPath);
+    const readmeSummary = readmeService.getReadmeSummary(projectPath);
 
     const explanation = explanationGenerator.generate({
       language,
       framework,
       architecture,
+      entryPoint,
       routes,
       controllers,
-      models
+      models,
+      readmeSummary,
+      folderTree
     });
 
-    await AnalysisReport.create({
+    const report = await AnalysisReport.create({
       repoUrl,
       language,
       framework,
       architecture,
+      entryPoint,
+      folderTree,
       routes,
       controllers,
       models,
+      readmeSummary: readmeSummary || "",
       summary: explanation.summary,
       executionFlow: explanation.executionFlow
     });
 
-    res.render("result", { explanation, routes, controllers, models });
+    await Repository.create({ repoUrl, reportId: report._id });
 
+    res.render("result", {
+      repoUrl,
+      language,
+      framework,
+      architecture,
+      entryPoint,
+      folderTree,
+      folderTreeText: explanation.folderTreeText,
+      routes,
+      controllers,
+      models,
+      readmeSummary: readmeSummary || null,
+      explanation
+    });
   } catch (err) {
-    console.log(err);
-    res.send("❌ Error analyzing repository.");
+    console.error("Analyze error:", err);
+    res.status(500).render("index", { error: err.message || "Failed to analyze repository. Check URL and try again." });
+  } finally {
+    if (projectPath) await gitService.cleanTemp(projectPath);
   }
 };

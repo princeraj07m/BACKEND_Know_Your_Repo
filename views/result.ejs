@@ -1,24 +1,117 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Analysis Result</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analysis – DevInsight</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background: #0f0f1a; color: #e4e4e7; padding: 1.5rem; line-height: 1.5; }
+    a { color: #818cf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    .back { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 1.5rem; color: #a5b4fc; }
+    h2 { font-size: 1.1rem; margin: 1.75rem 0 0.75rem; color: #c4b5fd; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.35rem; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .meta-item { background: rgba(30, 30, 46, 0.8); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); }
+    .meta-item strong { display: block; font-size: 0.75rem; color: #71717a; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .meta-item span { font-size: 0.95rem; }
+    pre, .code { background: rgba(0,0,0,0.35); padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; border: 1px solid rgba(255,255,255,0.06); }
+    .tree { font-family: ui-monospace, monospace; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    th { color: #71717a; font-weight: 600; }
+    .method { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+    .method.get { background: rgba(34, 197, 94, 0.25); color: #86efac; }
+    .method.post { background: rgba(59, 130, 246, 0.25); color: #93c5fd; }
+    .method.put { background: rgba(234, 179, 8, 0.25); color: #fde047; }
+    .method.delete { background: rgba(239, 68, 68, 0.25); color: #fca5a5; }
+    .method.patch { background: rgba(168, 85, 247, 0.25); color: #e9d5ff; }
+    .method.all { background: rgba(113, 113, 122, 0.3); color: #d4d4d8; }
+    .section { background: rgba(30, 30, 46, 0.5); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; border: 1px solid rgba(255,255,255,0.06); }
+    .readme { max-height: 320px; overflow-y: auto; }
+    ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+    li { margin: 0.25rem 0; }
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <div class="back"><a href="/">← Back to analyzer</a></div>
+    <h1>Analysis: <%= repoUrl %></h1>
 
-<h2>Architecture Summary</h2>
-<pre><%= explanation.summary %></pre>
+    <div class="meta">
+      <div class="meta-item"><strong>Language</strong><span><%= language || '—' %></span></div>
+      <div class="meta-item"><strong>Framework</strong><span><%= framework || '—' %></span></div>
+      <div class="meta-item"><strong>Architecture</strong><span><%= architecture || '—' %></span></div>
+      <div class="meta-item"><strong>Entry point</strong><span><%= entryPoint || '—' %></span></div>
+    </div>
 
-<h2>Execution Flow</h2>
-<pre><%= explanation.executionFlow %></pre>
+    <h2>Folder tree</h2>
+    <div class="section">
+      <pre class="tree"><%= (typeof folderTreeText !== 'undefined' && folderTreeText ? folderTreeText : '(no tree)').replace(/</g, '&lt;').replace(/>/g, '&gt;') %></pre>
+    </div>
 
-<h2>Routes</h2>
-<pre><%= routes %></pre>
+    <h2>Routes</h2>
+    <div class="section">
+      <% if (routes && routes.length) { %>
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Handler</th><th>Source</th></tr></thead>
+          <tbody>
+            <% routes.forEach(function(r) { %>
+              <tr>
+                <td><span class="method <%= (r.method || '').toLowerCase() %>"><%= r.method || '—' %></span></td>
+                <td><%= r.path || '—' %></td>
+                <td><%= r.handler || '—' %></td>
+                <td><%= r.sourceFile || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } else { %>
+        <p>No routes detected.</p>
+      <% } %>
+    </div>
 
-<h2>Controllers</h2>
-<pre><%= controllers %></pre>
+    <h2>Controllers</h2>
+    <div class="section">
+      <% if (controllers && controllers.length) { %>
+        <ul>
+          <% controllers.forEach(function(c) { %>
+            <li><strong><%= c.name %></strong> (<%= c.file %>) — <%= (c.methods || []).join(', ') || '—' %></li>
+          <% }); %>
+        </ul>
+      <% } else { %>
+        <p>No controllers detected.</p>
+      <% } %>
+    </div>
 
-<h2>Models</h2>
-<pre><%= models %></pre>
+    <h2>Models</h2>
+    <div class="section">
+      <% if (models && models.length) { %>
+        <ul>
+          <% models.forEach(function(m) { %>
+            <li><strong><%= m.name %></strong> (<%= m.file %>) — <%= m.schemaSummary || '—' %></li>
+          <% }); %>
+        </ul>
+      <% } else { %>
+        <p>No models detected.</p>
+      <% } %>
+    </div>
 
+    <% if (readmeSummary) { %>
+      <h2>README summary</h2>
+      <div class="section readme">
+        <pre class="code"><%= readmeSummary.replace(/</g, '&lt;').replace(/>/g, '&gt;') %></pre>
+      </div>
+    <% } %>
+
+    <h2>Summary & execution flow</h2>
+    <div class="section">
+      <pre class="code"><%= explanation && explanation.summary ? explanation.summary : '' %></pre>
+      <h3 style="margin-top: 1rem; font-size: 1rem;">Execution flow</h3>
+      <pre class="code"><%= explanation && explanation.executionFlow ? explanation.executionFlow : '' %></pre>
+    </div>
+  </div>
 </body>
 </html>
