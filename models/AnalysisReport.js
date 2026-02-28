@@ -26,6 +26,10 @@ const analysisReportSchema = new mongoose.Schema({
   readmeSummary: String,
   summary: String,
   executionFlow: String,
+  projectType: String,
+  frontend: mongoose.Schema.Types.Mixed,
+  ml: mongoose.Schema.Types.Mixed,
+  modules: mongoose.Schema.Types.Mixed,
   createdAt: { type: Date, default: Date.now }
 });
 

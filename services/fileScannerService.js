@@ -71,3 +71,25 @@ exports.detectLanguage = function detectLanguage(projectPath) {
   if (fs.existsSync(path.join(projectPath, "Gemfile"))) return "Ruby";
   return "Unknown";
 };
+
+const projectTypeDetector = require("./projectTypeDetector");
+
+exports.getRootModules = function getRootModules(projectPath) {
+  try {
+    const result = projectTypeDetector.detect(projectPath);
+    return {
+      frontendRoots: result.frontendRoots || [],
+      backendRoots: result.backendRoots || [],
+      mlRoots: result.mlRoots || [],
+      isMonorepo: result.isMonorepo === true
+    };
+  } catch (e) {
+    return { frontendRoots: [], backendRoots: [], mlRoots: [], isMonorepo: false };
+  }
+};
+
+exports.scanRoot = function scanRoot(projectPath, rootDir) {
+  const target = rootDir === "." ? projectPath : path.join(projectPath, rootDir);
+  if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) return [];
+  return buildTree(target, rootDir === "." ? "" : rootDir);
+};

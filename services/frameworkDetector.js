@@ -21,9 +21,11 @@ exports.detect = function detect(projectPath) {
   const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
   if (deps.next) return "Next.js";
   if (deps.nuxt || deps["nuxt3"]) return "Nuxt.js";
+  if (deps.vite) return "Vite";
   if (deps.express) return "Express.js";
   if (deps.koa) return "Koa";
   if (deps.fastify) return "Fastify";
+  if (deps["@nestjs/core"]) return "NestJS";
   if (deps.react || deps["react-dom"]) return "React";
   if (deps.vue) return "Vue.js";
   if (deps.angular || deps["@angular/core"]) return "Angular";

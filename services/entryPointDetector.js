@@ -17,7 +17,11 @@ exports.getEntryPoint = function getEntryPoint(projectPath) {
     const candidate = path.join(projectPath, pkg.main);
     if (fs.existsSync(candidate)) return pkg.main;
   }
-  const candidates = ["app.js", "index.js", "server.js", "src/index.js", "src/app.js", "main.js"];
+  const candidates = [
+    "app.js", "index.js", "server.js", "src/index.js", "src/app.js", "main.js",
+    "src/main.jsx", "src/main.tsx", "src/main.js", "src/index.jsx", "src/index.tsx",
+    "src/App.jsx", "src/App.tsx", "index.html"
+  ];
   for (const c of candidates) {
     const full = path.join(projectPath, c);
     if (fs.existsSync(full)) return c;

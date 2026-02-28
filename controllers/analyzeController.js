@@ -8,6 +8,7 @@ const controllerAnalyzer = require("../services/controllerAnalyzer");
 const modelAnalyzer = require("../services/modelAnalyzer");
 const readmeService = require("../services/readmeService");
 const explanationGenerator = require("../services/explanationGenerator");
+const monorepoAnalyzer = require("../services/monorepoAnalyzer");
 const AnalysisReport = require("../models/AnalysisReport");
 const Repository = require("../models/Repository");
 
@@ -23,15 +24,43 @@ exports.analyzeRepo = async (req, res, next) => {
 
     const folderTree = fileScanner.scan(projectPath);
     const language = fileScanner.detectLanguage(projectPath);
-    const framework = frameworkDetector.detect(projectPath);
-    const architecture = architectureDetector.detect(folderTree);
-    const entryPoint = entryPointDetector.getEntryPoint(projectPath);
-    const routes = routeAnalyzer.analyze(projectPath);
-    const controllers = controllerAnalyzer.analyze(projectPath);
-    const models = modelAnalyzer.analyze(projectPath);
+    let monorepoResult;
+    try {
+      monorepoResult = monorepoAnalyzer.analyze(projectPath);
+    } catch (e) {
+      monorepoResult = { projectType: "Unknown", isMonorepo: false, backendModules: [], frontendModules: [], mlModules: [] };
+    }
+
+    const projectType = monorepoResult.projectType || "Backend Only";
+    let framework = frameworkDetector.detect(projectPath);
+    let architecture = architectureDetector.detect(folderTree);
+    let entryPoint = entryPointDetector.getEntryPoint(projectPath);
+    let routes = routeAnalyzer.analyze(projectPath);
+    let controllers = controllerAnalyzer.analyze(projectPath);
+    let models = modelAnalyzer.analyze(projectPath);
+
+    if (monorepoResult.backendModules && monorepoResult.backendModules.length) {
+      const first = monorepoResult.backendModules[0];
+      if (first && !first.error) {
+        framework = first.framework || framework;
+        architecture = first.architecture || architecture;
+        entryPoint = first.entryPoint || entryPoint;
+        routes = first.routes || routes;
+        controllers = first.controllers || controllers;
+        models = first.models || models;
+      }
+    }
+    if (!(monorepoResult.backendModules && monorepoResult.backendModules.length) || (monorepoResult.backendModules[0] && monorepoResult.backendModules[0].error)) {
+      routes = routeAnalyzer.analyze(projectPath);
+      controllers = controllerAnalyzer.analyze(projectPath);
+      models = modelAnalyzer.analyze(projectPath);
+    }
+
     const readmeSummary = readmeService.getReadmeSummary(projectPath);
 
     const explanation = explanationGenerator.generate({
+      projectType,
+      monorepoResult,
       language,
       framework,
       architecture,
@@ -43,7 +72,7 @@ exports.analyzeRepo = async (req, res, next) => {
       folderTree
     });
 
-    const report = await AnalysisReport.create({
+    const reportPayload = {
       repoUrl,
       language,
       framework,
@@ -55,8 +84,24 @@ exports.analyzeRepo = async (req, res, next) => {
       models,
       readmeSummary: readmeSummary || "",
       summary: explanation.summary,
-      executionFlow: explanation.executionFlow
-    });
+      executionFlow: explanation.executionFlow,
+      projectType
+    };
+    if (monorepoResult.frontendModules && monorepoResult.frontendModules.length) {
+      reportPayload.frontend = monorepoResult.frontendModules;
+    }
+    if (monorepoResult.mlModules && monorepoResult.mlModules.length) {
+      reportPayload.ml = monorepoResult.mlModules;
+    }
+    if (monorepoResult.isMonorepo) {
+      reportPayload.modules = {
+        frontendRoots: monorepoResult.frontendRoots,
+        backendRoots: monorepoResult.backendRoots,
+        mlRoots: monorepoResult.mlRoots
+      };
+    }
+
+    const report = await AnalysisReport.create(reportPayload);
 
     await Repository.create({ repoUrl, reportId: report._id });
 
@@ -66,11 +111,14 @@ exports.analyzeRepo = async (req, res, next) => {
       framework,
       architecture,
       entryPoint,
+      projectType,
       folderTree,
       folderTreeText: explanation.folderTreeText,
       routes,
       controllers,
       models,
+      frontendModules: monorepoResult.frontendModules || [],
+      mlModules: monorepoResult.mlModules || [],
       readmeSummary: readmeSummary || null,
       explanation
     });
