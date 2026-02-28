@@ -13,14 +13,25 @@ router.post("/analyze/json", (req, res, next) => {
   req._forceJson = true;
   analyzeController.analyzeRepo(req, res, next);
 });
-router.post("/analyze-zip", function (req, res, next) {
+function handleZipUpload(req, res, next) {
   uploadZip.single("zipfile")(req, res, function (err) {
     if (err instanceof multer.MulterError) {
-      return res.status(400).render("index", { error: err.code === "LIMIT_FILE_SIZE" ? "ZIP file exceeds maximum size (100MB)." : "Invalid file upload." });
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "ZIP file exceeds maximum size (100MB)." : "Invalid file upload.";
+      if (req._forceJson) return res.status(400).json({ error: msg });
+      return res.status(400).render("index", { error: msg });
     }
-    if (err) return res.status(400).render("index", { error: err.message || "Invalid file." });
+    if (err) {
+      if (req._forceJson) return res.status(400).json({ error: err.message || "Invalid file." });
+      return res.status(400).render("index", { error: err.message || "Invalid file." });
+    }
     next();
   });
-}, analyzeController.analyzeZip);
+}
+
+router.post("/analyze-zip", handleZipUpload, analyzeController.analyzeZip);
+router.post("/analyze-zip/json", (req, res, next) => {
+  req._forceJson = true;
+  next();
+}, handleZipUpload, analyzeController.analyzeZip);
 
 module.exports = router;

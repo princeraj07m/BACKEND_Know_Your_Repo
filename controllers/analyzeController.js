@@ -233,6 +233,7 @@ exports.analyzeRepo = async (req, res) => {
 exports.analyzeZip = async (req, res) => {
   const zipService = require("../services/zipService");
   if (!req.file || !req.file.path) {
+    if (wantsJson(req)) return res.status(400).json({ error: "ZIP file is required." });
     return res.status(400).render("index", { error: "ZIP file is required." });
   }
   const zipPath = req.file.path;
@@ -253,6 +254,7 @@ exports.analyzeZip = async (req, res) => {
 
     if (timedOut || !result) {
       const partial = buildPartialResult(extractPath, repoLabel);
+      if (wantsJson(req)) return res.json(buildJsonPayload(partial, repoLabel, true));
       renderResult(res, partial, repoLabel, true);
       return;
     }
@@ -288,10 +290,13 @@ exports.analyzeZip = async (req, res) => {
 
     await AnalysisReport.create(reportPayload).then((report) => Repository.create({ repoUrl: repoLabel, reportId: report._id }));
 
+    if (wantsJson(req)) return res.json(buildJsonPayload(result, repoLabel, false));
     renderResult(res, result, repoLabel, false);
   } catch (err) {
     console.error("Analyze ZIP error:", err);
-    res.status(500).render("index", { error: err.message || "Failed to analyze ZIP file." });
+    const msg = err.message || "Failed to analyze ZIP file.";
+    if (wantsJson(req)) return res.status(500).json({ error: msg });
+    res.status(500).render("index", { error: msg });
   } finally {
     try {
       const fs = require("fs-extra");
