@@ -14,6 +14,33 @@ const projectTypeDetector = require("../services/projectTypeDetector");
 const AnalysisReport = require("../models/AnalysisReport");
 const Repository = require("../models/Repository");
 
+const wantsJson = (req) =>
+  req._forceJson === true ||
+  req.query.format === "json" ||
+  req.accepts("application/json") ||
+  req.get("X-Requested-With") === "XMLHttpRequest";
+
+function buildJsonPayload(data, repoUrl, partialAnalysisWarning) {
+  return {
+    repoUrl,
+    language: data.language,
+    framework: data.framework,
+    architecture: data.architecture,
+    entryPoint: data.entryPoint,
+    projectType: data.projectType,
+    folderTree: data.folderTree,
+    folderTreeText: data.explanation?.folderTreeText,
+    routes: data.routes,
+    controllers: data.controllers,
+    models: data.models,
+    frontendModules: (data.monorepoResult && data.monorepoResult.frontendModules) || [],
+    mlModules: (data.monorepoResult && data.monorepoResult.mlModules) || [],
+    readmeSummary: data.readmeSummary || null,
+    explanation: data.explanation,
+    partialAnalysisWarning: partialAnalysisWarning || false
+  };
+}
+
 function runAnalysis(projectPath) {
   const folderTree = fileScanner.scan(projectPath, { maxDepth: 8 });
   const language = fileScanner.detectLanguage(projectPath);
@@ -138,8 +165,9 @@ function renderResult(res, data, repoUrl, partialAnalysisWarning) {
 }
 
 exports.analyzeRepo = async (req, res) => {
-  const repoUrl = (req.body.repoUrl || "").trim();
+  const repoUrl = (req.body.repoUrl || req.body.url || "").trim();
   if (!repoUrl) {
+    if (wantsJson(req)) return res.status(400).json({ error: "Repository URL is required." });
     return res.status(400).render("index", { error: "Repository URL is required." });
   }
 
@@ -154,6 +182,7 @@ exports.analyzeRepo = async (req, res) => {
 
     if (timedOut || !result) {
       const partial = buildPartialResult(projectPath, repoUrl);
+      if (wantsJson(req)) return res.json(buildJsonPayload(partial, repoUrl, true));
       renderResult(res, partial, repoUrl, true);
       return;
     }
@@ -189,10 +218,13 @@ exports.analyzeRepo = async (req, res) => {
 
     await AnalysisReport.create(reportPayload).then((report) => Repository.create({ repoUrl, reportId: report._id }));
 
+    if (wantsJson(req)) return res.json(buildJsonPayload(result, repoUrl, false));
     renderResult(res, result, repoUrl, false);
   } catch (err) {
     console.error("Analyze error:", err);
-    res.status(500).render("index", { error: err.message || "Failed to analyze repository. Check URL and try again." });
+    const msg = err.message || "Failed to analyze repository. Check URL and try again.";
+    if (wantsJson(req)) return res.status(500).json({ error: msg });
+    res.status(500).render("index", { error: msg });
   } finally {
     if (projectPath) await gitService.cleanTemp(projectPath);
   }

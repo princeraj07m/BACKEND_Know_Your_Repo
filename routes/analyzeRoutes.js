@@ -9,6 +9,10 @@ router.get("/", (req, res) => {
 });
 
 router.post("/analyze", analyzeController.analyzeRepo);
+router.post("/analyze/json", (req, res, next) => {
+  req._forceJson = true;
+  analyzeController.analyzeRepo(req, res, next);
+});
 router.post("/analyze-zip", function (req, res, next) {
   uploadZip.single("zipfile")(req, res, function (err) {
     if (err instanceof multer.MulterError) {
