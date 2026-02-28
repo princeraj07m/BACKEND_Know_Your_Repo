@@ -35,6 +35,23 @@ function hasFrontendIndicators(projectPath) {
   return dirs.some((d) => fs.existsSync(path.join(projectPath, d)));
 }
 
+function hasJavaIndicators(projectPath) {
+  if (fs.existsSync(path.join(projectPath, "pom.xml")) || fs.existsSync(path.join(projectPath, "build.gradle"))) return true;
+  try {
+    const p = path.join(projectPath, "pom.xml");
+    if (fs.existsSync(p)) {
+      const c = fs.readFileSync(p, "utf8");
+      if (c && (c.includes("spring-boot") || c.includes("spring-boot-starter"))) return true;
+    }
+    const g = path.join(projectPath, "build.gradle");
+    if (fs.existsSync(g)) {
+      const c = fs.readFileSync(g, "utf8");
+      if (c && (c.includes("spring-boot") || c.includes("spring-boot-starter"))) return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 function hasMLIndicators(projectPath) {
   if (fs.existsSync(path.join(projectPath, "requirements.txt")) || fs.existsSync(path.join(projectPath, "pyproject.toml"))) return true;
   const files = fs.readdirSync(projectPath, { withFileTypes: true });
@@ -87,12 +104,11 @@ exports.detect = function detect(projectPath) {
     const isMonorepo = frontendRoots.length + backendRoots.length >= 2 || (frontendRoots.length >= 1 && backendRoots.length >= 1);
     const rootAtProject = hasPackageJson && (hasBackendIndicators(projectPath) || hasFrontendIndicators(projectPath));
 
-    if (hasRequirements || hasNotebooks || hasMLIndicators(projectPath)) {
-      mlRoots.push(".");
-    }
+    if (hasRequirements || hasNotebooks || hasMLIndicators(projectPath)) mlRoots.push(".");
+    if (hasJavaIndicators(projectPath) && !backendRoots.includes(".")) backendRoots.push(".");
     if (rootAtProject && !isMonorepo) {
-      if (hasBackendIndicators(projectPath) && !hasFrontendIndicators(projectPath)) {
-        return { projectType: "Backend Only", frontendRoots: [], backendRoots: ["."], mlRoots: [], isMonorepo: false };
+      if ((hasBackendIndicators(projectPath) || hasJavaIndicators(projectPath)) && !hasFrontendIndicators(projectPath)) {
+        return { projectType: hasJavaIndicators(projectPath) ? "Spring Boot / Java" : "Backend Only", frontendRoots: [], backendRoots: ["."], mlRoots: mlRoots, isMonorepo: false };
       }
       if (hasFrontendIndicators(projectPath) && !hasBackendIndicators(projectPath)) {
         return { projectType: "Frontend Only", frontendRoots: ["."], backendRoots: [], mlRoots: [], isMonorepo: false };
@@ -117,8 +133,8 @@ exports.detect = function detect(projectPath) {
       return { projectType: "ML Project", frontendRoots: [], backendRoots: [], mlRoots: ["."], isMonorepo: false };
     }
 
-    if (hasBackendIndicators(projectPath)) {
-      return { projectType: "Backend Only", frontendRoots: [], backendRoots: ["."], mlRoots: [], isMonorepo: false };
+    if (hasBackendIndicators(projectPath) || hasJavaIndicators(projectPath)) {
+      return { projectType: hasJavaIndicators(projectPath) ? "Spring Boot / Java" : "Backend Only", frontendRoots: [], backendRoots: ["."], mlRoots: [], isMonorepo: false };
     }
     if (hasFrontendIndicators(projectPath)) {
       return { projectType: "Frontend Only", frontendRoots: ["."], backendRoots: [], mlRoots: [], isMonorepo: false };

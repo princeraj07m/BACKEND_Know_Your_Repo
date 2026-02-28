@@ -9,11 +9,28 @@ const architectureDetector = require("./architectureDetector");
 const entryPointDetector = require("./entryPointDetector");
 const frontendAnalyzer = require("./frontendAnalyzer");
 const mlAnalyzer = require("./mlAnalyzer");
+const springBootAnalyzer = require("./springBootAnalyzer");
 const fileScanner = require("./fileScannerService");
 
 function analyzeBackend(projectPath, rootDir) {
   const rootPath = rootDir === "." ? projectPath : path.join(projectPath, rootDir);
-  const folderTree = fileScanner.scanRoot(projectPath, rootDir);
+  const springResult = springBootAnalyzer.analyze(projectPath, rootDir);
+  if (springResult.isSpringBoot) {
+    const folderTree = fileScanner.scanRoot ? fileScanner.scanRoot(projectPath, rootDir) : fileScanner.scan(rootPath);
+    return {
+      root: rootDir,
+      framework: "Spring Boot",
+      architecture: "Spring Boot / Layered",
+      entryPoint: "Main class (Application.java) or build config",
+      routes: springResult.routes || [],
+      controllers: springResult.controllers || [],
+      models: springResult.models || springResult.entities || [],
+      services: springResult.services || [],
+      applicationConfig: springResult.applicationConfig,
+      folderTree
+    };
+  }
+  const folderTree = fileScanner.scanRoot ? fileScanner.scanRoot(projectPath, rootDir) : fileScanner.scan(rootPath);
   const architecture = architectureDetector.detect(folderTree);
   return {
     root: rootDir,

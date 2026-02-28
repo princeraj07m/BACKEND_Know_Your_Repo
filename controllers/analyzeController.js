@@ -33,6 +33,8 @@ function buildJsonPayload(data, repoUrl, partialAnalysisWarning) {
     routes: data.routes,
     controllers: data.controllers,
     models: data.models,
+    services: data.services || [],
+    applicationConfig: data.applicationConfig || null,
     frontendModules: (data.monorepoResult && data.monorepoResult.frontendModules) || [],
     mlModules: (data.monorepoResult && data.monorepoResult.mlModules) || [],
     readmeSummary: data.readmeSummary || null,
@@ -59,6 +61,8 @@ function runAnalysis(projectPath) {
   let controllers = controllerAnalyzer.analyze(projectPath);
   let models = modelAnalyzer.analyze(projectPath);
 
+  let services = [];
+  let applicationConfig = null;
   if (monorepoResult.backendModules && monorepoResult.backendModules.length) {
     const first = monorepoResult.backendModules[0];
     if (first && !first.error) {
@@ -68,6 +72,8 @@ function runAnalysis(projectPath) {
       routes = first.routes || routes;
       controllers = first.controllers || controllers;
       models = first.models || models;
+      services = first.services || [];
+      applicationConfig = first.applicationConfig || null;
     }
   }
   if (!(monorepoResult.backendModules && monorepoResult.backendModules.length) || (monorepoResult.backendModules[0] && monorepoResult.backendModules[0].error)) {
@@ -88,6 +94,7 @@ function runAnalysis(projectPath) {
     routes,
     controllers,
     models,
+    services,
     readmeSummary,
     folderTree
   });
@@ -101,6 +108,8 @@ function runAnalysis(projectPath) {
     routes,
     controllers,
     models,
+    services,
+    applicationConfig,
     readmeSummary,
     monorepoResult,
     projectType,

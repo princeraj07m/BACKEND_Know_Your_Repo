@@ -12,6 +12,16 @@ function readPackageJson(projectPath) {
 }
 
 exports.detect = function detect(projectPath) {
+  const pomXml = path.join(projectPath, "pom.xml");
+  const buildGradle = path.join(projectPath, "build.gradle");
+  const buildGradleKts = path.join(projectPath, "build.gradle.kts");
+  for (const p of [pomXml, buildGradle, buildGradleKts]) {
+    if (!fs.existsSync(p)) continue;
+    try {
+      const content = fs.readFileSync(p, "utf8");
+      if (content && (content.includes("spring-boot") || content.includes("spring-boot-starter"))) return "Spring Boot";
+    } catch (e) {}
+  }
   const pkg = readPackageJson(projectPath);
   if (!pkg) {
     if (fs.existsSync(path.join(projectPath, "manage.py"))) return "Django";

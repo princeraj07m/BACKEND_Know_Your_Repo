@@ -41,6 +41,24 @@ function treeToDisplayLines(node, indent) {
   return lines;
 }
 
+function springBootFlow(backendModules, flat) {
+  const first = backendModules[0];
+  const routes = flat && flat.routes ? flat.routes : (first && first.routes) || [];
+  const controllers = flat && flat.controllers ? flat.controllers : (first && first.controllers) || [];
+  const models = flat && flat.models ? flat.models : (first && first.models) || [];
+  const services = flat && flat.services ? flat.services : (first && first.services) || [];
+  let out = "1. Spring Boot application starts from Main class.\n";
+  out += "2. Controllers (@RestController/@Controller) expose REST endpoints via @GetMapping/@PostMapping.\n";
+  if (services.length) out += "3. Services (@Service) contain business logic.\n";
+  if (models.length) out += "4. Entities (@Entity) map to database tables.\n";
+  out += "5. Application config (application.properties/yml) defines DB, port, etc.\n";
+  if (routes.length) out += "\nEndpoints:\n" + routes.map(function (r) { return "  " + (r.method || "GET") + " " + (r.path || "") + " → " + (r.handler || ""); }).join("\n") + "\n";
+  if (controllers.length) out += "\nControllers:\n" + controllers.map(function (c) { return "  " + (c.name || "") + " (" + (c.file || "") + ")"; }).join("\n") + "\n";
+  if (services.length) out += "\nServices:\n" + services.map(function (s) { return "  " + (s.name || "") + " (" + (s.file || "") + ")"; }).join("\n") + "\n";
+  if (models.length) out += "\nEntities:\n" + models.map(function (m) { return "  " + (m.name || "") + ": " + (m.schemaSummary || ""); }).join("\n") + "\n";
+  return out;
+}
+
 function backendFlow(backendModules, flat) {
   const routes = flat && flat.routes ? flat.routes : (backendModules[0] && backendModules[0].routes) || [];
   const controllers = flat && flat.controllers ? flat.controllers : (backendModules[0] && backendModules[0].controllers) || [];
@@ -120,6 +138,7 @@ exports.generate = function generate(data) {
   const routes = data.routes || (backendModules[0] && backendModules[0].routes) || [];
   const controllers = data.controllers || (backendModules[0] && backendModules[0].controllers) || [];
   const models = data.models || (backendModules[0] && backendModules[0].models) || [];
+  const services = data.services || (backendModules[0] && backendModules[0].services) || [];
   const readmeSummary = data.readmeSummary;
   let folderTree = data.folderTree;
 
@@ -136,20 +155,32 @@ exports.generate = function generate(data) {
   summary += "Framework: " + framework + "\n";
   summary += "Architecture: " + architecture + "\n";
   summary += "Entry point: " + entryPoint + "\n";
+  if (services.length) summary += "Services layer: " + services.length + " service(s) (Spring Boot)\n";
   if (monorepo && monorepo.isMonorepo) {
     summary += "Monorepo: frontend roots " + (monorepo.frontendRoots || []).join(", ") + "; backend roots " + (monorepo.backendRoots || []).join(", ") + "; ML roots " + (monorepo.mlRoots || []).join(", ") + "\n";
   }
   if (frontendModules.length) {
     const fe = frontendModules[0];
-    summary += "Frontend: " + (fe.framework || "-") + ", " + (fe.renderMode || "SPA") + ", components " + (fe.components && fe.components.length) + ", pages " + (fe.pages && fe.pages.length) + "\n";
+    summary += "Frontend: " + (fe.framework || "-") + ", " + (fe.renderMode || "SPA");
+    if (fe.components && fe.components.length) summary += ", " + fe.components.length + " components";
+    if (fe.pages && fe.pages.length) summary += ", " + fe.pages.length + " pages";
+    if (fe.routes && fe.routes.length) summary += ", " + fe.routes.length + " routes";
+    if (fe.stateManagement && fe.stateManagement.length && fe.stateManagement[0] !== "None detected") summary += ", state: " + fe.stateManagement.join(", ");
+    summary += "\n";
   }
   if (mlModules.length && mlModules[0].libs && mlModules[0].libs.length) {
-    summary += "ML libs: " + mlModules[0].libs.join(", ") + "\n";
+    summary += "ML libs: " + mlModules[0].libs.join(", ");
+    if (mlModules[0].trainingScripts && mlModules[0].trainingScripts.length) summary += ", " + mlModules[0].trainingScripts.length + " training script(s)";
+    if (mlModules[0].notebooks && mlModules[0].notebooks.length) summary += ", " + mlModules[0].notebooks.length + " notebook(s)";
+    summary += "\n";
   }
   if (readmeSummary) summary += "\nREADME excerpt:\n" + readmeSummary.slice(0, 500) + (readmeSummary.length > 500 ? "..." : "");
 
+  const isSpringBoot = framework === "Spring Boot" || (backendModules[0] && backendModules[0].framework === "Spring Boot");
   let executionFlow = "";
-  if (projectType === "Backend Only" || (projectType === "Fullstack" && backendModules.length)) {
+  if (projectType === "Spring Boot / Java" || isSpringBoot) {
+    executionFlow += "--- Spring Boot ---\n" + springBootFlow(backendModules, { routes, controllers, models, services, entryPoint });
+  } else if (projectType === "Backend Only" || (projectType === "Fullstack" && backendModules.length)) {
     executionFlow += "--- Backend ---\n" + backendFlow(backendModules, { routes, controllers, models, entryPoint });
   }
   if (projectType === "Frontend Only") {
