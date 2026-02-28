@@ -60,7 +60,29 @@ function backendFlow(backendModules, flat) {
 function frontendFlow(frontendModules) {
   const m = frontendModules[0];
   if (!m) return "Frontend: no module analyzed.\n";
-  return (m.executionFlow || "1. Entry mounts root.\n2. Router resolves URL to page/component.\n3. State (if any) drives UI.\n");
+  let out = "Frontend execution flow:\n";
+  out += "Browser → Router → Component → API (if any) → State Update → UI Render\n\n";
+  out += m.executionFlow || "";
+  if (m.routes && m.routes.length) {
+    out += "\nFrontend routes:\n";
+    m.routes.slice(0, 30).forEach(function (r) {
+      out += "  " + (r.path || "") + " → " + (r.component || r.file || "") + " (" + (r.type || "") + ")\n";
+    });
+    if (m.routes.length > 30) out += "  ... and " + (m.routes.length - 30) + " more\n";
+  }
+  return out;
+}
+
+function fullstackFlowText() {
+  return "Fullstack execution flow:\nBrowser → Frontend Router → API Call → Backend Route → Controller → DB → Response → UI\n";
+}
+
+function frontendOnlyFlowText() {
+  return "Frontend execution flow:\nBrowser → Router → Component → API → State Update → UI Render\n";
+}
+
+function mlFlowText() {
+  return "ML pipeline: Dataset → Preprocessing → Model Training → Evaluation → Inference\n";
 }
 
 function mlFlow(mlModules) {
@@ -70,13 +92,17 @@ function mlFlow(mlModules) {
 }
 
 function integrationFlow(backendModules, frontendModules) {
-  let out = "Integration flow:\n";
+  let out = fullstackFlowText();
+  out += "\nIntegration flow:\n";
   out += "1. User interacts with frontend (SPA/SSR).\n";
   out += "2. Frontend calls backend APIs (REST/GraphQL etc.).\n";
   out += "3. Backend processes request, uses DB/services, returns response.\n";
   out += "4. Frontend updates UI from response.\n";
   if (backendModules.length && backendModules[0].routes && backendModules[0].routes.length) {
     out += "\nBackend routes (sample): " + backendModules[0].routes.slice(0, 8).map(function (r) { return r.method + " " + r.path; }).join(", ") + "\n";
+  }
+  if (frontendModules.length && frontendModules[0].routes && frontendModules[0].routes.length) {
+    out += "\nFrontend routes (sample): " + frontendModules[0].routes.slice(0, 8).map(function (r) { return r.path; }).join(", ") + "\n";
   }
   return out;
 }
@@ -126,11 +152,13 @@ exports.generate = function generate(data) {
   if (projectType === "Backend Only" || (projectType === "Fullstack" && backendModules.length)) {
     executionFlow += "--- Backend ---\n" + backendFlow(backendModules, { routes, controllers, models, entryPoint });
   }
-  if (projectType === "Frontend Only" || (projectType === "Fullstack" && frontendModules.length) || (projectType === "Monorepo" && frontendModules.length)) {
+  if (projectType === "Frontend Only") {
+    executionFlow += "--- Frontend ---\n" + frontendOnlyFlowText() + frontendFlow(frontendModules);
+  } else if ((projectType === "Fullstack" && frontendModules.length) || (projectType === "Monorepo" && frontendModules.length)) {
     executionFlow += "--- Frontend ---\n" + frontendFlow(frontendModules);
   }
   if (projectType === "ML Project" || (projectType === "Monorepo" && mlModules.length) || (projectType === "Fullstack" && mlModules.length)) {
-    executionFlow += "--- ML pipeline ---\n" + mlFlow(mlModules);
+    executionFlow += "--- ML pipeline ---\n" + mlFlowText() + mlFlow(mlModules);
   }
   if ((projectType === "Fullstack" || projectType === "Monorepo") && backendModules.length && frontendModules.length) {
     executionFlow += "--- " + integrationFlow(backendModules, frontendModules);

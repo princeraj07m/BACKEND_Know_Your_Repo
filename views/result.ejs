@@ -45,7 +45,16 @@
       <div class="meta-item"><strong>Framework</strong><span><%= framework || '—' %></span></div>
       <div class="meta-item"><strong>Architecture</strong><span><%= architecture || '—' %></span></div>
       <div class="meta-item"><strong>Entry point</strong><span><%= entryPoint || '—' %></span></div>
+      <% if (typeof projectType !== 'undefined' && projectType) { %>
+        <div class="meta-item"><strong>Project type</strong><span><%= projectType %></span></div>
+      <% } %>
     </div>
+
+    <% if (typeof partialAnalysisWarning !== 'undefined' && partialAnalysisWarning) { %>
+      <div class="section" style="background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4);">
+        <p style="margin: 0; color: #fde047;">⚠ Large repository — partial results generated.</p>
+      </div>
+    <% } %>
 
     <h2>Folder tree</h2>
     <div class="section">
@@ -55,6 +64,7 @@
     <h2>Routes</h2>
     <div class="section">
       <% if (routes && routes.length) { %>
+        <p><strong>Backend routes</strong></p>
         <table>
           <thead><tr><th>Method</th><th>Path</th><th>Handler</th><th>Source</th></tr></thead>
           <tbody>
@@ -69,9 +79,28 @@
           </tbody>
         </table>
       <% } else { %>
-        <p>No routes detected.</p>
+        <p>No backend routes detected.</p>
       <% } %>
     </div>
+
+    <% if (frontendModules && frontendModules.length && frontendModules[0].routes && frontendModules[0].routes.length) { %>
+      <h2>Frontend routes</h2>
+      <div class="section">
+        <p><strong><%= frontendModules[0].framework || 'Frontend' %> — <%= frontendModules[0].routes.length %> route(s)</strong></p>
+        <table>
+          <thead><tr><th>Path</th><th>Component / Type</th><th>Source</th></tr></thead>
+          <tbody>
+            <% frontendModules[0].routes.forEach(function(r) { %>
+              <tr>
+                <td><%= r.path || '—' %></td>
+                <td><%= r.component || '—' %> <%= r.type ? '(' + r.type + ')' : '' %></td>
+                <td><%= r.file || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
 
     <h2>Controllers</h2>
     <div class="section">

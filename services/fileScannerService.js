@@ -1,10 +1,15 @@
 const fs = require("fs-extra");
 const path = require("path");
 
-const IGNORE_DIRS = new Set(["node_modules", ".git", "vendor", "__pycache__", ".next", "dist", "build", ".cache", "coverage", ".nyc_output"]);
+const IGNORE_DIRS = new Set(["node_modules", ".git", "vendor", "__pycache__", ".next", "dist", "build", ".cache", "coverage", ".nyc_output", "venv", ".venv"]);
 const IGNORE_FILES = new Set([".DS_Store", "Thumbs.db"]);
+const DEFAULT_MAX_DEPTH = 8;
+const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 
-function buildTree(dir, basePath = "") {
+function buildTree(dir, basePath, depth, maxDepth) {
+  depth = depth || 0;
+  maxDepth = maxDepth ?? DEFAULT_MAX_DEPTH;
+  if (depth > maxDepth) return [];
   const items = [];
   let names = [];
   try {
@@ -22,18 +27,21 @@ function buildTree(dir, basePath = "") {
       if (IGNORE_DIRS.has(name)) continue;
       items.push({
         name: name + "/",
-        children: buildTree(fullPath, relativePath),
+        children: buildTree(fullPath, relativePath, depth + 1, maxDepth),
         type: "dir"
       });
     } else {
-      items.push({ name, type: "file", path: relativePath });
+      if (stat.size <= MAX_FILE_SIZE_BYTES) items.push({ name, type: "file", path: relativePath });
     }
   }
   return items.sort((a, b) => (a.type !== b.type ? (a.type === "dir" ? -1 : 1) : a.name.localeCompare(b.name)));
 }
 
-function getAllRelativePaths(dir, baseDir, list = []) {
+function getAllRelativePaths(dir, baseDir, list, maxDepth, depth) {
   baseDir = baseDir || dir;
+  maxDepth = maxDepth ?? DEFAULT_MAX_DEPTH;
+  depth = depth || 0;
+  if (depth > maxDepth) return list;
   let names = [];
   try {
     names = fs.readdirSync(dir);
@@ -46,20 +54,22 @@ function getAllRelativePaths(dir, baseDir, list = []) {
     const relativePath = path.relative(baseDir, fullPath);
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
-      getAllRelativePaths(fullPath, baseDir, list);
+      getAllRelativePaths(fullPath, baseDir, list, maxDepth, depth + 1);
     } else {
-      list.push(relativePath.replace(/\\/g, "/"));
+      if (stat.size <= MAX_FILE_SIZE_BYTES) list.push(relativePath.replace(/\\/g, "/"));
     }
   }
   return list;
 }
 
-exports.scan = function scan(projectPath) {
-  return buildTree(projectPath);
+exports.scan = function scan(projectPath, options) {
+  const maxDepth = (options && options.maxDepth) ?? DEFAULT_MAX_DEPTH;
+  return buildTree(projectPath, "", 0, maxDepth);
 };
 
-exports.getAllFiles = function getAllFiles(projectPath) {
-  return getAllRelativePaths(projectPath);
+exports.getAllFiles = function getAllFiles(projectPath, options) {
+  const maxDepth = (options && options.maxDepth) ?? DEFAULT_MAX_DEPTH;
+  return getAllRelativePaths(projectPath, undefined, [], maxDepth, 0);
 };
 
 exports.detectLanguage = function detectLanguage(projectPath) {
@@ -88,8 +98,9 @@ exports.getRootModules = function getRootModules(projectPath) {
   }
 };
 
-exports.scanRoot = function scanRoot(projectPath, rootDir) {
+exports.scanRoot = function scanRoot(projectPath, rootDir, options) {
   const target = rootDir === "." ? projectPath : path.join(projectPath, rootDir);
   if (!fs.existsSync(target) || !fs.statSync(target).isDirectory()) return [];
-  return buildTree(target, rootDir === "." ? "" : rootDir);
+  const maxDepth = (options && options.maxDepth) ?? DEFAULT_MAX_DEPTH;
+  return buildTree(target, rootDir === "." ? "" : rootDir, 0, maxDepth);
 };

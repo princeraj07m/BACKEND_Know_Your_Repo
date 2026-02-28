@@ -28,8 +28,13 @@
       <div class="error"><%= error %></div>
     <% } %>
     <form action="/analyze" method="POST">
-      <input type="text" name="repoUrl" placeholder="https://github.com/username/repo" required value="<%= typeof repoUrl !== 'undefined' ? (repoUrl || '') : '' %>" />
+      <input type="text" name="repoUrl" placeholder="https://github.com/username/repo" value="<%= typeof repoUrl !== 'undefined' ? (repoUrl || '') : '' %>" />
       <button type="submit">Analyze repository</button>
+    </form>
+    <p class="sub" style="margin-top: 1rem; margin-bottom: 0.5rem;">Or upload a ZIP file (max 100MB)</p>
+    <form action="/analyze-zip" method="POST" enctype="multipart/form-data">
+      <input type="file" name="zipfile" accept=".zip" required />
+      <button type="submit">Analyze ZIP</button>
     </form>
   </div>
 </body>
